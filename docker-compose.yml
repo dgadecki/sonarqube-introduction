@@ -1,0 +1,54 @@
+version: '3.4'
+
+services:
+  # PostgreSQL database
+  event-postgres-db:
+    image: postgres:14.0
+    container_name: postgres-event
+    restart: always
+    ports:
+      - "5439:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 2s
+      timeout: 20s
+    environment:
+      POSTGRES_PASSWORD: admin
+    volumes:
+      - ./.docker/postgres/pg_data:/var/lib/postgresql/data
+
+  event-sonarqube:
+    restart: always
+    image: sonarqube:9.4.0-community
+    container_name: sonarqube-event
+    depends_on:
+      - event-postgres-db
+    ports:
+      - "9000:9000"
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://event-postgres-db:5432/sonarqube
+      SONAR_JDBC_USERNAME: sonarqube
+      SONAR_JDBC_PASSWORD: sonarqube
+    volumes:
+      - ./.docker/sonarqube/logs:/opt/sonarqube/logs
+      - ./.docker/sonarqube/data:/opt/sonarqube/data
+      - ./.docker/sonarqube/extensions:/opt/sonarqube/extensions
+
+  # RabbitMQ
+  event-rabbitmq:
+    image: rabbitmq:3.8-management
+    container_name: rabbitmq-event
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 30s
+    environment:
+      RABBITMQ_DEFAULT_USER: event
+      RABBITMQ_DEFAULT_PASS: event
+    volumes:
+      - ./.docker/rabbitmq/data/:/var/lib/rabbitmq/
+      - ./.docker/rabbitmq/log/:/var/log/rabbitmq/
